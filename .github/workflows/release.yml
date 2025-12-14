@@ -1,0 +1,43 @@
+name: Build and Release Binaries
+
+on:
+  release:
+    types: [published]  # Triggers only when you publish a release (not on draft/pre-release)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest  # Can build both Linux and Windows binaries from Ubuntu runner
+    strategy:
+      matrix:
+        rid: [linux-x64, win-x64]  # Add 'osx-x64' or 'linux-arm64' here if desired
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET 10
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'  # Will use the latest .NET 10 SDK
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Publish single-file self-contained
+      run: |
+        dotnet publish --configuration Release \
+          -r ${{ matrix.rid }} \
+          --self-contained true \
+          /p:PublishSingleFile=true \
+          /p:IncludeNativeLibrariesForSelfExtract=true  # Recommended for better single-file behavior on Linux
+          --output ./publish/${{ matrix.rid }}
+
+    - name: Upload binaries to release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./publish/${{ matrix.rid }}/${{ github.event.repository.name }}${{ matrix.rid == 'win-x64' && '.exe' || '' }}
+        asset_name: ${{ github.event.repository.name }}-${{ github.event.release.tag_name }}-${{ matrix.rid }}${{ matrix.rid == 'win-x64' && '.exe' || '' }}
+        asset_content_type: application/octet-stream

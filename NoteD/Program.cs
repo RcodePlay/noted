@@ -1,5 +1,6 @@
 ﻿using Terminal.Gui;
 using System.Collections.ObjectModel;
+using System.Runtime.InteropServices;
 using NStack;
 
 
@@ -34,7 +35,7 @@ notesFolder = LoadOrChooseNotesFolder();
 
 var win = new Window
 {
-    Title = "NoteD - Simple Markdown Note Taker",
+    Title = "NoteD - The Simple Note Taker",
     X = 0,
     Y = 1,
     Width = Dim.Fill(),
@@ -43,17 +44,17 @@ var win = new Window
 
 var menu = new MenuBar
 {
-    Menus = new []
-    {
-        new MenuBarItem("_File", new []
-        {
+    Menus =
+    [
+        new MenuBarItem("_File",
+        [
             new MenuItem("_Choose Notes Folder", "", ChooseNotesFolder),
             new MenuItem("_New Note", "", CreateNewNote),
             new MenuItem("_Save Current Note", "", SaveCurrentNote),
             new MenuItem("_Delete Selected Note", "", DeleteSelectedNote),
             new MenuItem("_Quit", "", () => Application.RequestStop())
-        })
-    }
+        ])
+    ]
 };
 
 win.Add(listView, textView);
@@ -105,6 +106,8 @@ void RefreshNoteList()
 
 void ChooseNotesFolder()
 {
+    var examplePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? @"C:\Users\You\Documents\NoteD" : "/home/you/Documents/NoteD";
+    
     var inputDialog = new Dialog
     {
         Title = "Choose Notes Folder",
@@ -114,7 +117,7 @@ void ChooseNotesFolder()
 
     var label = new Label
     {
-        Text = @"Enter full path to notes folder (e.g. C:\\Users\\You\\Documents\\NoteD):",
+        Text = $"Enter full path to notes folder (e.g. {examplePath}):",
         X = 1,
         Y = 1,
         Width = Dim.Fill() - 2
