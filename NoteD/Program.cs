@@ -128,7 +128,7 @@ listView.SelectedItemChanged += (args) =>
 
     if (File.Exists(selectedFile))
     {
-        textView.Text = File.ReadAllText(selectedFile);
+        textView.Text = File.ReadAllText(selectedFile).Replace("\r\n", "\n");
         currentFilePath = selectedFile;
         isNoteDirty = false;
     }
@@ -409,6 +409,19 @@ void DeleteSelectedNote()
     
 }
 
+string GetContent(string title)
+{
+    try
+    {
+        return File.ReadAllText(title).Replace("\r\n", "\n");
+    }
+    catch (Exception ex)
+    {
+        MessageBox.ErrorQuery("Error", ex.Message, "OK");
+    }
+    return "";
+}
+
 void ShowSearchBar()
 {
     var searchDialog = new Dialog
@@ -438,7 +451,7 @@ void ShowSearchBar()
         Height = Dim.Fill() - 1
     };
 
-    var searchResults = new List<string>();
+    var searchResults = new List<SearchResult>();
     searchListView.SetSource(searchResults);
 
     void RunSearch(string query)
@@ -446,21 +459,27 @@ void ShowSearchBar()
         try
         {
             searchResults.Clear();
-            if (string.IsNullOrWhiteSpace(query))
-                searchResults.AddRange(noteFiles);
+            if (string.IsNullOrWhiteSpace(query)) return;
 
-            var matches = Process.ExtractTop(
-                query,
-                noteFiles,
-                limit: noteFiles.Count);
+            foreach (var fileName in noteFiles)
+            {
+                var nameScore = Fuzz.PartialRatio(query.ToLower(), fileName.ToLower());
+                if (nameScore > 70)
+                    searchResults.Add(new SearchResult(fileName, "Match in file name"));
 
-            var filteredMatches = matches.Where(m => m.Score >= 40);
+                var content = GetContent(Path.Combine(notesFolder!, fileName));
+                if (string.IsNullOrEmpty(content)) return;
+                
+                var contentScore = Fuzz.PartialRatio(query.ToLower(), content.ToLower());
+                if (contentScore > 70)
+                {
+                    var snippet = ExtractSnippet(content, query);
+                    if (!searchResults.Any(r => r.FileName == fileName && r.Snippet == snippet))
+                        searchResults.Add(new SearchResult(fileName, snippet));
+                }
+            }
             
-            searchResults.AddRange(filteredMatches
-                .OrderByDescending(m => m.Score)
-                .Select(m => m.Value));
-            
-            searchListView.SetSource(searchResults);
+            searchListView.SetSource(searchResults.ToList());
             searchListView.SetNeedsDisplay();
 
             if (searchResults.Count > 0)
@@ -472,6 +491,35 @@ void ShowSearchBar()
         }
     }
 
+    string ExtractSnippet(string text, string query)
+    {
+        var index = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+        if (index == -1) return "Match found ...";
+        
+        var words = text.Split([ ' ', '\n', '\r', '\t' ], StringSplitOptions.RemoveEmptyEntries);
+        var wordIndex = -1;
+        var currentPos = 0;
+
+        for (var i = 0; i < words.Length; i++)
+        {
+            var foundAt = text.IndexOf(words[i], currentPos, StringComparison.Ordinal);
+            if (foundAt >= index)
+            {
+                wordIndex = i;
+                break;
+            }
+            currentPos = foundAt + words[i].Length;
+        }
+        
+        if (wordIndex == -1) return "..." + query + "...";
+        
+        var start = Math.Max(0, wordIndex - 1);
+        var count = Math.Min(words.Length - start, 3);
+        
+        var contextWords = words.Skip(start).Take(count);
+        return "..." + string.Join(" ", contextWords) + "...";
+    }
+    
     var debounceTimer = new System.Timers.Timer(250) { AutoReset = false };
 
     textField.TextChanged += _ =>
@@ -490,8 +538,8 @@ void ShowSearchBar()
 
     searchListView.OpenSelectedItem += args =>
     {
-        var selectedFileName = searchResults[args.Item];
-        var originalIndex = noteFiles.IndexOf(selectedFileName);
+        var result = searchResults[args.Item];
+        var originalIndex = noteFiles.IndexOf(result.FileName);
         if (originalIndex >= 0)
             listView.SelectedItem = originalIndex;
 
@@ -515,6 +563,11 @@ public class NoteDSettings
     
     [JsonPropertyName("show_markdown_preview")]
     public bool ShowMarkdownPreview { get; }
+}
+
+public record SearchResult(string FileName, string Snippet)
+{
+    public override string ToString() => $"[{FileName}] {Snippet}";
 }
 
 public static class SettingsManager
