@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FuzzySharp;
 using NStack;
 
 
@@ -77,6 +78,7 @@ var menu = new MenuBar
             new MenuItem("_New Note", "", MenuCreateNewNote),
             new MenuItem("_Save Current Note", "", SaveCurrentNote),
             new MenuItem("_Delete Selected Note", "", DeleteSelectedNote),
+            new MenuItem("_Fuzzy Search", "", ShowSearchBar),
             new MenuItem("_Quit", "", () => Application.RequestStop())
         ]),
         new MenuBarItem("_Settings",
@@ -387,21 +389,116 @@ void DeleteSelectedNote()
     }
 
     var res = MessageBox.Query("Delete?", $"Delete {Path.GetFileName(currentFilePath)}?", "Yes", "No");
-    if (res == 0)
+    if (res != 0)
+    {
+        return;
+    }
+
+    try
+    {
+        File.Delete(currentFilePath);
+        RefreshNoteList();
+        textView.Text = "";
+        currentFilePath = null;
+        isNoteDirty = false;
+    }
+    catch (Exception ex)
+    {
+        MessageBox.ErrorQuery("Error", ex.Message, "OK");
+    }
+    
+}
+
+void ShowSearchBar()
+{
+    var searchDialog = new Dialog
+    {
+        Title = "Fuzzy Search",
+        X = Pos.Center(),
+        Y = 1,
+        Width = Dim.Percent(50),
+        Height = 10,
+        Modal = true
+    };
+
+    var textField = new TextField
+    {
+        X = 1,
+        Y = 2,
+        Width = Dim.Fill() - 2,
+        Height = 1,
+        CanFocus = true
+    };
+
+    var searchListView = new ListView
+    {
+        X = 1,
+        Y = 4,
+        Width = Dim.Fill() - 2,
+        Height = Dim.Fill() - 1
+    };
+
+    var searchResults = new List<string>();
+    searchListView.SetSource(searchResults);
+
+    void RunSearch(string query)
     {
         try
         {
-            File.Delete(currentFilePath);
-            RefreshNoteList();
-            textView.Text = "";
-            currentFilePath = null;
-            isNoteDirty = false;
+            searchResults.Clear();
+            if (string.IsNullOrWhiteSpace(query))
+                searchResults.AddRange(noteFiles);
+
+            var matches = Process.ExtractTop(
+                query,
+                noteFiles,
+                limit: noteFiles.Count);
+
+            var filteredMatches = matches.Where(m => m.Score >= 40);
+            
+            searchResults.AddRange(filteredMatches
+                .OrderByDescending(m => m.Score)
+                .Select(m => m.Value));
+            
+            searchListView.SetSource(searchResults);
+            searchListView.SetNeedsDisplay();
+
+            if (searchResults.Count > 0)
+                searchListView.SelectedItem = 0;
         }
         catch (Exception ex)
         {
-            MessageBox.ErrorQuery("Error", ex.Message, "OK");
+            MessageBox.ErrorQuery("Error running search", ex.Message, "OK");
         }
     }
+
+    var debounceTimer = new System.Timers.Timer(250) { AutoReset = false };
+
+    textField.TextChanged += _ =>
+    {
+        debounceTimer.Stop();
+        debounceTimer.Start();
+    };
+
+    debounceTimer.Elapsed += (_, _) =>
+    {
+        Application.MainLoop.Invoke(() =>
+        {
+            RunSearch(textField.Text.ToString()!);
+        });
+    };
+
+    searchListView.OpenSelectedItem += args =>
+    {
+        var selectedFileName = searchResults[args.Item];
+        var originalIndex = noteFiles.IndexOf(selectedFileName);
+        if (originalIndex >= 0)
+            listView.SelectedItem = originalIndex;
+
+        Application.Top.Remove(searchDialog);
+    };
+    searchDialog.Add(textField, searchListView);
+    Application.Run(searchDialog);
 }
 
 Application.Run();

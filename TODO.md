@@ -7,15 +7,15 @@
     - Nested folders display #06
     - Markdown rendering preview #09
     - Syntax highlighting #05
-    - Fuzzy search #01
     - Note tagging/metadata #02
     - Recent notes list #11
     - Smart status bar (Line/Column number, size in words and characters, file saved timestamp, read-only status) #03
     - External editor hook #12
     - Theme switching (preset themes, community, user specific) #10
-    - 
+    - Make fuzzy search look inside files for queries
 
 - Features added:
     - Auto-save
     - settings.json for settings
     - Auto create note when you start typing and hit save
+    - Fuzzy search
