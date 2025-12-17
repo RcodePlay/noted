@@ -13,7 +13,10 @@ string? currentFilePath = null;
 
 var noteFiles = new ObservableCollection<string>();
 
+// Global flags
 var isNoteDirty = false;
+var noteCreationSuccess = false;
+
 Timer? autoSaveTimer = null;
 
 SettingsManager.LoadSettings();
@@ -71,7 +74,7 @@ var menu = new MenuBar
         new MenuBarItem("_File",
         [
             new MenuItem("_Choose Notes Folder", "", ChooseNotesFolder),
-            new MenuItem("_New Note", "", CreateNewNote),
+            new MenuItem("_New Note", "", MenuCreateNewNote),
             new MenuItem("_Save Current Note", "", SaveCurrentNote),
             new MenuItem("_Delete Selected Note", "", DeleteSelectedNote),
             new MenuItem("_Quit", "", () => Application.RequestStop())
@@ -240,7 +243,7 @@ string LoadOrChooseNotesFolder()
     return notesFolder ?? throw new Exception("No folder selected");
 }
 
-void CreateNewNote()
+void CreateNewNote(string contentToSave)
 {
     if (string.IsNullOrEmpty(notesFolder))
     {
@@ -274,6 +277,8 @@ void CreateNewNote()
         Text = "Create",
         IsDefault = true
     };
+    
+    noteCreationSuccess = false;
 
     ok.Clicked += () =>
     {
@@ -283,33 +288,48 @@ void CreateNewNote()
         var filename = $"{date}{slug}.md";
         var fullPath = Path.Combine(notesFolder!, filename);
 
-        int counter = 1;
+        var counter = 1;
         while (File.Exists(fullPath))
         {
             filename = $"{date}{slug}-{counter++}.md";
             fullPath = Path.Combine(notesFolder!, filename);
         }
 
-        File.WriteAllText(fullPath, "");
+        File.WriteAllText(fullPath, contentToSave);
         RefreshNoteList();
 
         var index = noteFiles.IndexOf(filename);
         if (index >= 0)
         {
             listView.SelectedItem = index;
-            textView.Text = "";
+            textView.Text = contentToSave;
             currentFilePath = fullPath;
             isNoteDirty = false;
             textView.SetFocus();
         }
 
+        noteCreationSuccess = true;
+        Application.RequestStop();
+    };
+    
+    var cancelButton = new Button { Text = "Cancel" };
+    cancelButton.Clicked += () =>
+    {
+        textView.Text = contentToSave;
+        noteCreationSuccess = false;
         Application.RequestStop();
     };
 
     nameDialog.Add(label, nameField);
     nameDialog.AddButton(ok);
+    nameDialog.AddButton(cancelButton);
 
     Application.Run(nameDialog);
+}
+
+void MenuCreateNewNote()
+{
+    CreateNewNote("");
 }
 
 void SaveNoteIfDirty()
@@ -330,15 +350,25 @@ void SaveNoteIfDirty()
 
 void SaveCurrentNote()
 {
+    var unsavedContent = textView.Text.ToString();
+    
     if (string.IsNullOrEmpty(currentFilePath) || string.IsNullOrEmpty(notesFolder))
     {
-        MessageBox.ErrorQuery("Error", "No note open to save.", "OK");
-        return;
+        if (string.IsNullOrEmpty(unsavedContent))
+        {
+            MessageBox.Query("NoteD", "Nothing to save.", "OK");
+            return;
+        }
+        
+        CreateNewNote(unsavedContent);
+
+        if (!noteCreationSuccess)
+            return;
     }
 
     try
     {
-        File.WriteAllText(currentFilePath, textView.Text!.ToString());
+        File.WriteAllText(currentFilePath!, unsavedContent);
         isNoteDirty = false; // Reset dirty flag after manual save
         MessageBox.Query("Saved", $"Saved to {Path.GetFileName(currentFilePath)}", "OK");
     }
