@@ -613,6 +613,42 @@ public class CommandHandler(CommandHandlerContext context)
         Application.Run(commandPaletteDialog);
     }
 
+    private void OpenThemeSwitcher()
+    {
+        var themeSwitcherDialog = new Dialog
+        {
+            Title = "Theme Switcher",
+            X = Pos.Center(),
+            Y = 1,
+            Width = Dim.Percent(50),
+            Height = Dim.Percent(50),
+            Modal = true
+        };
+        
+        var themes = ThemeManager.Themes.Keys.ToList();
+
+        var listview = new ListView(themes)
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(1),
+            Height = Dim.Fill(1)
+        };
+        themeSwitcherDialog.Add(listview);
+
+        listview.SetSource(themes);
+        
+        listview.OpenSelectedItem += (args) =>
+        {
+            ThemeManager.ApplyTheme(themes[args.Item]);
+            SettingsManager.Settings.Theme = themes[args.Item];
+            SettingsManager.SaveSettings();
+            Application.RequestStop();
+        };
+
+        Application.Run(themeSwitcherDialog);
+    }
+
     private Dictionary<string, Action> CommandMap => new()
     {
         { "Create New Note", MenuCreateNewNote },
@@ -620,6 +656,7 @@ public class CommandHandler(CommandHandlerContext context)
         { "Delete Selected Note", DeleteSelectedNote },
         { "Fuzzy Search Notes", ShowSearchBar },
         { "Move Note to Folder", MoveFileToFolder },
-        { "Choose Notes Folder", ChooseNotesFolder }
+        { "Choose Notes Folder", ChooseNotesFolder },
+        { "Open Theme Switcher", OpenThemeSwitcher }
     };
 }

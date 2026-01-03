@@ -1,6 +1,5 @@
 - Features to add:
     - Better keyboard shortcuts
-    - Color themes
     - Markdown rendering preview
     - Syntax highlighting
     - Note tagging/metadata
@@ -18,3 +17,4 @@
     - Nested folders display
     - Moving files between folders
     - Command palette (VSCode style)
+    - Color themes

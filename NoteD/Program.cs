@@ -9,6 +9,8 @@ Application.Init();
 var noteFiles = new ObservableCollection<string>();
 Timer? autoSaveTimer = null;
 SettingsManager.LoadSettings();
+ThemeManager.Initialize();
+ThemeManager.ApplyTheme(SettingsManager.Settings.Theme);
 
 // Will use this line for later customization of accent color
 // Colors.Base.Normal = Application.Driver.MakeAttribute(Color.Green, Color.Black);
@@ -142,6 +144,9 @@ public class NoteDSettings
     
     [JsonPropertyName("show_markdown_preview")]
     public bool ShowMarkdownPreview { get; }
+    
+    [JsonPropertyName("theme")]
+    public string Theme { get; set; } = "Classic";
 }
 
 public record SearchResult(string FileName, string Snippet)
@@ -200,7 +205,7 @@ public static class SettingsManager
         }
     }
 
-    private static void SaveSettings()
+    public static void SaveSettings()
     {
         var path = SettingsFilePath;
         try
