@@ -350,22 +350,39 @@ public class CommandHandler(CommandHandlerContext context)
             {
                 searchResults.Clear();
                 if (string.IsNullOrWhiteSpace(query)) return;
+                
+                var isTagSearch = query.StartsWith("#");
+                var cleanQuery = query.ToLower().Trim();
 
                 foreach (var fileName in context.NoteFiles)
                 {
-                    var nameScore = Fuzz.PartialRatio(query.ToLower(), fileName.ToLower());
-                    if (nameScore > 70)
-                        searchResults.Add(new SearchResult(fileName, "Match in file name"));
+                    var fullPath = Path.Combine(context.NotesFolder!, fileName);
+                    var content = GetContent(fullPath);
+                    if (string.IsNullOrEmpty(content)) continue;
 
-                    var content = GetContent(Path.Combine(context.NotesFolder!, fileName));
-                    if (string.IsNullOrEmpty(content)) return;
-                
-                    var contentScore = Fuzz.PartialRatio(query.ToLower(), content.ToLower());
-                    if (contentScore > 70)
+                    if (isTagSearch)
                     {
-                        var snippet = ExtractSnippet(content, query);
-                        if (!searchResults.Any(r => r.FileName == fileName && r.Snippet == snippet))
-                            searchResults.Add(new SearchResult(fileName, snippet));
+                        if (content.Contains(cleanQuery, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var snippet = ExtractSnippet(content, cleanQuery);
+                            searchResults.Add(new SearchResult(fileName, $"Tag match: {cleanQuery}"));
+                        }
+                    }
+                    else
+                    {
+                        var nameScore = Fuzz.PartialRatio(query.ToLower(), fileName.ToLower());
+                        if (nameScore > 70)
+                            searchResults.Add(new SearchResult(fileName, "Match in file name"));
+                    
+                        if (string.IsNullOrEmpty(content)) return;
+                
+                        var contentScore = Fuzz.PartialRatio(query.ToLower(), content.ToLower());
+                        if (contentScore > 70)
+                        {
+                            var snippet = ExtractSnippet(content, query);
+                            if (!searchResults.Any(r => r.FileName == fileName && r.Snippet == snippet))
+                                searchResults.Add(new SearchResult(fileName, snippet));
+                        }
                     }
                 }
             

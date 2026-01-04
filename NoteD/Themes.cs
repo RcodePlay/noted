@@ -6,10 +6,40 @@ public class ThemeManager
 {
     public static readonly Dictionary<string, Theme> Themes = new ();
 
+    public class ThemeProxy
+    {
+        public required Dictionary<string, string> Main { get; set; }
+        public Dictionary<string, string>? Dialog { get; set; }
+    }
+    
     public struct Theme
     {
         public ColorScheme Main;
         public ColorScheme Dialog;
+    }
+
+    public static ColorScheme ParseScheme(Dictionary<string, string> dict)
+    {
+        var scheme = new ColorScheme();
+
+        Terminal.Gui.Attribute GetAttr(string key, Color defFg, Color defBg)
+        {
+            if (dict.TryGetValue(key, out var val))
+            {
+                var parts = val.Split('/');
+                if (parts.Length == 2 &&
+                    Enum.TryParse<Color>(parts[0], true, out var fg) &&
+                    Enum.TryParse<Color>(parts[1], true, out var bg))
+                    return Terminal.Gui.Attribute.Make(fg, bg);
+            }
+            return Terminal.Gui.Attribute.Make(defFg, defBg);
+        }
+        
+        scheme.Normal = GetAttr("Normal", Color.White, Color.Blue);
+        scheme.Focus = GetAttr("Focus", Color.Black, Color.Cyan);
+        scheme.HotNormal = GetAttr("HotNormal", Color.BrightYellow, Color.Blue);
+        scheme.HotFocus = GetAttr("HotFocus", Color.DarkGray, Color.Blue);
+        return scheme;
     }
 
     public static void Initialize()

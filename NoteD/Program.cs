@@ -4,16 +4,40 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using NoteD;
 
+
 Application.Init();
 
 var noteFiles = new ObservableCollection<string>();
 Timer? autoSaveTimer = null;
 SettingsManager.LoadSettings();
+
+if (SettingsManager.Settings.CustomThemes != null)
+    foreach (var theme in SettingsManager.Settings.CustomThemes)
+    {
+        ThemeManager.Theme realTheme;
+        
+        if (theme.Value.Dialog != null)
+        {
+            realTheme = new ThemeManager.Theme
+            {
+                Main = ThemeManager.ParseScheme(theme.Value.Main),
+                Dialog = ThemeManager.ParseScheme(theme.Value.Dialog)
+            };
+        }
+        else
+        {
+            realTheme = new ThemeManager.Theme
+            {
+                Main = ThemeManager.ParseScheme(theme.Value.Main),
+                Dialog = Colors.Dialog
+            };
+        }
+        
+        ThemeManager.Themes[theme.Key] = realTheme;
+    }
+        
 ThemeManager.Initialize();
 ThemeManager.ApplyTheme(SettingsManager.Settings.Theme);
-
-// Will use this line for later customization of accent color
-// Colors.Base.Normal = Application.Driver.MakeAttribute(Color.Green, Color.Black);
 
 var listView = new ListView
 {
@@ -147,6 +171,9 @@ public class NoteDSettings
     
     [JsonPropertyName("theme")]
     public string Theme { get; set; } = "Classic";
+    
+    [JsonPropertyName("custom_themes")]
+    public Dictionary<string, ThemeManager.ThemeProxy>? CustomThemes { get; init; }
 }
 
 public record SearchResult(string FileName, string Snippet)

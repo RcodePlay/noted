@@ -1,12 +1,8 @@
 - Features to add:
     - Better keyboard shortcuts
-    - Markdown rendering preview
-    - Syntax highlighting
-    - Note tagging/metadata
     - Recent notes list
     - Smart status bar (Line/Column number, size in words and characters, file saved timestamp, read-only status)
     - External editor hook
-    - Theme switching (preset themes, community, user specific)
 
 - Features added:
     - Auto-save
@@ -18,3 +14,5 @@
     - Moving files between folders
     - Command palette (VSCode style)
     - Color themes
+    - Theme switching (preset themes, community, user specific)
+    - Note tagging/metadata
