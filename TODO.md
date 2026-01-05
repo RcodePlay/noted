@@ -1,5 +1,10 @@
 - Features to add:
-    - Better keyboard shortcuts
+    - Encryption for notes
+    - Syncing to git, Nextcloud (WebDAV)
+    - Advanced formatting options (tables, code blocks, etc)
+    - Task management (to-do lists, reminders)
+    - Note sharing (public/private links) (maybe at v2)
+    - Plugin system for third-party extensions (maybe at v2)
 
 - Features added:
     - Auto-save
