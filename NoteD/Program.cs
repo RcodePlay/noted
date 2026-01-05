@@ -59,7 +59,15 @@ var textView = new TextView
     CanFocus = true
 };
 
-var context = new CommandHandlerContext(listView, textView, noteFiles, null, null, false, false);
+var cursor = "Line: 1, Col: 1";
+var stats = "Chars: 0, Words: 0";
+
+var statusBar = new StatusBar([
+    new StatusItem(Key.Null, cursor, null),
+    new StatusItem(Key.Null, stats, null)
+]);
+
+var context = new CommandHandlerContext(listView, textView, statusBar, noteFiles, null, null, false, false, SettingsManager.Settings.ExternalEditor);
 var handler = new CommandHandler(context);
 
 var notesFolder = handler.LoadOrChooseNotesFolder();
@@ -96,10 +104,15 @@ var menu = new MenuBar
             new MenuItem("_New Note", "", handler.MenuCreateNewNote),
             new MenuItem("_Save Current Note", "", handler.SaveCurrentNote),
             new MenuItem("_Delete Selected Note", "", handler.DeleteSelectedNote),
+            new MenuItem("_Recent Notes", "", handler.ShowRecentNotes),
+            new MenuItem("Open in _External Editor", "", handler.OpenInEditorWrapper),
+            new MenuItem("_Quit", "", () => Application.RequestStop())
+        ]),
+        new MenuBarItem("_Utilities", [
             new MenuItem("Command _Palette", "", handler.OpenCommandPalette),
             new MenuItem("_Fuzzy Search", "", handler.ShowSearchBar),
             new MenuItem("_Move note to folder", "", handler.MoveFileToFolder),
-            new MenuItem("_Quit", "", () => Application.RequestStop())
+            new MenuItem("Open _Theme Switcher", "", handler.OpenThemeSwitcher)
         ]),
         new MenuBarItem("_Settings",
         [
@@ -120,7 +133,7 @@ var menu = new MenuBar
 
 win.Add(listView, textView);
 
-Application.Top.Add(menu, win);
+Application.Top.Add(menu, win, statusBar);
 
 if (SettingsManager.Settings.AutoSaveEnabled)
 {
@@ -154,6 +167,16 @@ listView.SelectedItemChanged += (args) =>
     context.IsNoteDirty = false;
 };
 
+textView.ContentsChanged += _ =>
+{
+    handler.UpdateStatusBar();
+};
+
+textView.UnwrappedCursorPosition += _ =>
+{
+    handler.UpdateStatusBar();
+};
+
 Application.Run();
 autoSaveTimer?.Dispose();
 Application.Shutdown();
@@ -161,13 +184,13 @@ Application.Shutdown();
 public class NoteDSettings
 {
     [JsonPropertyName("auto_save_enabled")]
-    public bool AutoSaveEnabled { get; } = true;
+    public bool AutoSaveEnabled { get; init; } = true;
 
     [JsonPropertyName("auto_save_delay_ms")]
-    public int AutoSaveDelayMs { get; } = 5000;
-    
-    [JsonPropertyName("show_markdown_preview")]
-    public bool ShowMarkdownPreview { get; }
+    public int AutoSaveDelayMs { get; init; } = 5000;
+
+    [JsonPropertyName("external_editor")]
+    public string ExternalEditor { get; init; } = "";
     
     [JsonPropertyName("theme")]
     public string Theme { get; set; } = "Classic";

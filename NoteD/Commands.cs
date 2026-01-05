@@ -3,17 +3,20 @@ using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 using FuzzySharp;
 using NStack;
+using System.Diagnostics;
 
 namespace NoteD;
 
 public record CommandHandlerContext(
     ListView ListView,
     TextView TextView,
+    StatusBar StatusBar,
     ObservableCollection<string> NoteFiles,
     string? NotesFolder,
     string? CurrentFilePath,
     bool IsNoteDirty,
-    bool NoteCreationSuccess
+    bool NoteCreationSuccess,
+    string ExternalEditor
 )
 {
     public ObservableCollection<string> NoteFiles { get; set; } = NoteFiles;
@@ -298,6 +301,28 @@ public class CommandHandler(CommandHandlerContext context)
         }
     
     }
+    
+    private (int chars, int words) GetTextStats(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return (0, 0);
+
+        var charCount = text.Length;
+        var wordCount = text.Split([' ', '\r', '\n', '\t'], 
+            StringSplitOptions.RemoveEmptyEntries).Length;
+
+        return (charCount, wordCount);
+    }
+
+    public void UpdateStatusBar()
+    {
+        var cursorInfo = $"Line: {context.TextView.CurrentRow + 1}, Col: {context.TextView.CurrentColumn + 1}";
+        var stats = GetTextStats(context.TextView.Text.ToString()!);
+        var displayStats = $", Chars: {stats.chars}, Words: {stats.words}";
+        
+        context.StatusBar.Items[0].Title = cursorInfo; 
+        context.StatusBar.Items[1].Title = displayStats;
+        context.StatusBar.SetNeedsDisplay();
+    }
 
     private string GetContent(string title)
     {
@@ -364,7 +389,6 @@ public class CommandHandler(CommandHandlerContext context)
                     {
                         if (content.Contains(cleanQuery, StringComparison.OrdinalIgnoreCase))
                         {
-                            var snippet = ExtractSnippet(content, cleanQuery);
                             searchResults.Add(new SearchResult(fileName, $"Tag match: {cleanQuery}"));
                         }
                     }
@@ -596,7 +620,7 @@ public class CommandHandler(CommandHandlerContext context)
             X = 1,
             Y = 3,
             Width = Dim.Fill(1),
-            Height = Dim.Fill(6),
+            Height = Dim.Fill(1),
             AllowsMarking = false,
             CanFocus = true
         };
@@ -630,7 +654,7 @@ public class CommandHandler(CommandHandlerContext context)
         Application.Run(commandPaletteDialog);
     }
 
-    private void OpenThemeSwitcher()
+    public void OpenThemeSwitcher()
     {
         var themeSwitcherDialog = new Dialog
         {
@@ -666,12 +690,94 @@ public class CommandHandler(CommandHandlerContext context)
         Application.Run(themeSwitcherDialog);
     }
 
+    public void ShowRecentNotes()
+    {
+        var recentsDialog = new Dialog
+        {
+            Title = "Recent Notes",
+            X = Pos.Center(),
+            Y = 1,
+            Width = Dim.Percent(50),
+            Height = Dim.Percent(50),
+            Modal = true
+        };
+
+        var recentsList = new ListView
+        {
+            X = 1,
+            Y = 1,
+            Width = Dim.Fill(1),
+            Height = Dim.Fill(1)
+        };
+        
+        recentsDialog.Add(recentsList);
+        
+        var recentFiles = context.NoteFiles
+            .Select(f => new {
+                FileName = f,
+                FullPath = Path.Combine(context.NotesFolder!, f),
+                LastModified = File.GetLastWriteTime(Path.Combine(context.NotesFolder!, f))
+            })
+            .OrderByDescending(f => f.LastModified)
+            .Take(6)
+            .ToList();
+        
+        var recentFileNames = recentFiles.Select(f => f.FileName).ToList();
+        
+        recentsList.SetSource(recentFileNames);
+
+        recentsList.OpenSelectedItem += (args) =>
+        {
+            var selected = recentFiles[args.Item];
+            context.CurrentFilePath = selected.FullPath;
+            context.TextView.Text = GetContent(selected.FullPath);
+            context.ListView.SelectedItem = context.NoteFiles.IndexOf(selected.FileName);
+            
+            Application.RequestStop();
+        };
+        
+        Application.Run(recentsDialog);
+    }
+
+    private void OpenInEditor(string filePath)
+    {
+        var editor = context.ExternalEditor;
+
+        if (string.IsNullOrWhiteSpace(editor)) return;
+        
+        var startInfo = new ProcessStartInfo
+        {
+           FileName = editor,
+           Arguments = $"\"{filePath}\"",
+           UseShellExecute = true, 
+           CreateNoWindow = false
+        };
+
+        try
+        {
+            System.Diagnostics.Process.Start(startInfo);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            Console.WriteLine($"Error: Could not find '{editor}'. " +
+                              "Ensure it is in your PATH or the full path is correct.");
+        }
+    }
+
+    public void OpenInEditorWrapper()
+    {
+        var file = context.CurrentFilePath;
+        if (file != null) OpenInEditor(file);
+    }
+
     private Dictionary<string, Action> CommandMap => new()
     {
         { "Create New Note", MenuCreateNewNote },
         { "Save Current Note", SaveCurrentNote },
         { "Delete Selected Note", DeleteSelectedNote },
         { "Fuzzy Search Notes", ShowSearchBar },
+        { "Show Recent Notes", ShowRecentNotes },
+        { "Open in External Editor", OpenInEditorWrapper },
         { "Move Note to Folder", MoveFileToFolder },
         { "Choose Notes Folder", ChooseNotesFolder },
         { "Open Theme Switcher", OpenThemeSwitcher }

@@ -1,8 +1,5 @@
 - Features to add:
     - Better keyboard shortcuts
-    - Recent notes list
-    - Smart status bar (Line/Column number, size in words and characters, file saved timestamp, read-only status)
-    - External editor hook
 
 - Features added:
     - Auto-save
@@ -16,3 +13,6 @@
     - Color themes
     - Theme switching (preset themes, community, user specific)
     - Note tagging/metadata
+    - Smart status bar (Line/Column number, size in words and characters, file saved timestamp, read-only status)
+    - Recent notes list
+    - External editor hook
