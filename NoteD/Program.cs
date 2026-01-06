@@ -1,5 +1,6 @@
 ﻿using Terminal.Gui;
 using System.Collections.ObjectModel;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using NoteD;
@@ -39,6 +40,38 @@ if (SettingsManager.Settings.CustomThemes != null)
 ThemeManager.Initialize();
 ThemeManager.ApplyTheme(SettingsManager.Settings.Theme);
 
+string? masterPassword = null; 
+
+var loginPromptDialog = new Dialog { Title = "NoteD Login", Modal = true };
+var loginLabel = new Label("Enter your master password. If you forget this password, THERE IS NO WAY TO RESET IT!!") { X = 1, Y = 1 };
+var loginInput = new TextField("") { X = 1, Y = 2, Width = Dim.Fill() - 2, Secret = true };
+var okBtn = new Button("Login") { IsDefault = true };
+var exitBtn = new Button("Exit");
+
+loginPromptDialog.Add(loginLabel, loginInput);
+loginPromptDialog.AddButton(okBtn);
+loginPromptDialog.AddButton(exitBtn);
+
+okBtn.Clicked += () => {
+    if (string.IsNullOrWhiteSpace(loginInput.Text.ToString())) {
+        MessageBox.ErrorQuery("Error", "Password cannot be empty", "OK");
+        return;
+    }
+    masterPassword = loginInput.Text.ToString();
+    Application.RequestStop();
+};
+
+exitBtn.Clicked += () => {
+    Application.RequestStop();
+    Environment.Exit(0);
+};
+
+Application.Run(loginPromptDialog);
+
+if (string.IsNullOrWhiteSpace(masterPassword)) Environment.Exit(0);
+
+var security = new SecurityModule();
+
 var listView = new ListView
 {
     X = 0,
@@ -59,8 +92,8 @@ var textView = new TextView
     CanFocus = true
 };
 
-var cursor = "Line: 1, Col: 1";
-var stats = "Chars: 0, Words: 0";
+const string cursor = "Line: 1, Col: 1";
+const string stats = "Chars: 0, Words: 0";
 
 var statusBar = new StatusBar([
     new StatusItem(Key.Null, cursor, null),
@@ -72,6 +105,29 @@ var handler = new CommandHandler(context);
 
 var notesFolder = handler.LoadOrChooseNotesFolder();
 context.NotesFolder = notesFolder;
+
+handler.RefreshNoteList();
+
+foreach (var note in context.NoteFiles)
+{
+    try
+    {
+        security.UnprotectFile(Path.Combine(notesFolder, note), masterPassword);
+    }
+    catch (InvalidDataException)
+    {
+        Console.WriteLine($"File {note} is not encrypted. Skipping decryption.");
+    }
+    catch (CryptographicException)
+    {
+        MessageBox.ErrorQuery("Access Denied", "Incorrect Password.", "OK");
+        Environment.Exit(0);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error decrypting file {note}: {ex.Message}");
+    }
+}
 
 textView.KeyPress += (key) =>
 {
@@ -133,7 +189,14 @@ var menu = new MenuBar
 
 win.Add(listView, textView);
 
-Application.Top.Add(menu, win, statusBar);
+var top = new Toplevel {
+    X = 0,
+    Y = 0,
+    Width = Dim.Fill(),
+    Height = Dim.Fill()
+};
+
+top.Add(menu, win, statusBar);
 
 if (SettingsManager.Settings.AutoSaveEnabled)
 {
@@ -177,7 +240,17 @@ textView.UnwrappedCursorPosition += _ =>
     handler.UpdateStatusBar();
 };
 
-Application.Run();
+Application.Run(top);
+
+foreach (var note in noteFiles)
+{
+    var path = Path.Combine(notesFolder, note);
+    if (File.Exists(path))
+    {
+        security.ProtectFile(path, masterPassword);
+    }
+}
+
 autoSaveTimer?.Dispose();
 Application.Shutdown();
 

@@ -1,8 +1,10 @@
 - Features to add:
-    - Encryption for notes
     - Syncing to git, Nextcloud (WebDAV)
     - Advanced formatting options (tables, code blocks, etc)
     - Task management (to-do lists, reminders)
+    - Recovery key for lost password (maybe at v2)
+    - Memory zeroing after exit (maybe at v2)
+    - Storing decrypted notes & password hash in RAM (maybe at v2)
     - Note sharing (public/private links) (maybe at v2)
     - Plugin system for third-party extensions (maybe at v2)
 
@@ -21,3 +23,4 @@
     - Smart status bar (Line/Column number, size in words and characters, file saved timestamp, read-only status)
     - Recent notes list
     - External editor hook
+    - Encryption for notes (Master password)
